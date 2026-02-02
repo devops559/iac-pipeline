@@ -49,7 +49,7 @@ jobs:
       - name: Terraform Init
         run: |
           chmod +x init.sh
-          ./init.sh "$ENV"
+          bash init.sh "$ENV"
 
       - name: Terraform Apply
         run: terraform apply -input=false env_out-${ENV}.tfplan

@@ -56,7 +56,7 @@ jobs:
       - name: Terraform Init
         run: |
           chmod +x init.sh
-          ./init.sh "$ENV"
+          bash init.sh "$ENV"
 
       - name: Terraform Plan
         run: |
