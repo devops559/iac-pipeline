@@ -44,7 +44,7 @@ jobs:
       - name: Download Terraform plan
         uses: actions/download-artifact@v4
         with:
-          name: tfplan-${ENV}-${{ inputs.commit_sha }}
+          name: tfplan-${{ env.ENV }}-${{ inputs.commit_sha }}
 
       - name: Terraform Init
         run: |
@@ -64,5 +64,5 @@ jobs:
         if: ${{ env.ENV != 'prod' }}
         uses: actions/upload-artifact@v4
         with:
-          name: promoted-${ENV}-${{ inputs.commit_sha }}
+          name: promoted-${{ env.ENV }}-${{ inputs.commit_sha }}
           path: promoted-${ENV}.txt

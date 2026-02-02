@@ -68,5 +68,5 @@ jobs:
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tfplan-${ENV}-${GITHUB_SHA}
-          path: env_out-${ENV}.tfplan
+          name: tfplan-${{ env.ENV }}-${{ github.sha }}
+          path: env_out-${{ env.ENV }}.tfplan

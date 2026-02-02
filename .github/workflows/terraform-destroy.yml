@@ -7,10 +7,7 @@ on:
         description: "Target environment to destroy"
         required: true
         type: choice
-        options:
-          - dev
-          - beta
-          - prod
+        options: [dev, beta, prod]
 
       commit_sha:
         description: "Commit SHA that was last applied"
@@ -19,7 +16,6 @@ on:
 jobs:
   destroy:
     runs-on: ubuntu-latest
-
     container:
       image: miradeeba766/iac-ci:1.14.6
 
@@ -54,6 +50,7 @@ jobs:
         run: |
           terraform plan \
             -destroy \
+            -input=false \
             -var-file="environments/${ENV}.tfvars" \
             -out="env_out-${ENV}.destroy.tfplan"
 
