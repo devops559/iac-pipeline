@@ -97,18 +97,22 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: miradeeba766/iac-ci:1.14.6
+    environment:
+      name: ${{ inputs.env }}
     continue-on-error: true
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0   # required for git diff
 
       - name: Download plan artifacts
         uses: actions/download-artifact@v4
         with:
           name: plan-${{ env.ENV }}
 
-      - name: Run drift detection
+      - name: Terraform drift detection
         shell: bash
         run: |
           set -euo pipefail
@@ -117,16 +121,33 @@ jobs:
 
           PLAN_FILE="env-${ENV}.tfplan"
           DRIFT_JSON="$IAC_OUTPUT_DIR/drift-${ENV}.json"
-          
+
+          # AWS credentials (required for backend + state)
           export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
           export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+          export AWS_REGION="${AWS_REGION:-us-east-1}"
 
           chmod +x init.sh
-           bash init.sh "$ENV"
+          bash init.sh "$ENV"
 
           echo "Using existing Terraform plan: $PLAN_FILE"
           terraform show -json "$PLAN_FILE" > "$DRIFT_JSON"
 
+          # ---------------- FIRST DEPLOYMENT GUARD ----------------
+          echo "Checking for existing Terraform state..."
+
+          if ! terraform state list >/dev/null 2>&1; then
+            echo "No Terraform state found — first deployment. Skipping drift enforcement."
+            exit 0
+          fi
+
+          STATE_RESOURCES=$(terraform state list | wc -l | tr -d ' ')
+          if [ "$STATE_RESOURCES" -eq 0 ]; then
+            echo "Empty Terraform state — skipping drift enforcement."
+            exit 0
+          fi
+
+          # ---------------- DRIFT CALCULATION ----------------
           CREATES=$(jq '[.resource_changes[] | select(.change.actions | index("create"))] | length' "$DRIFT_JSON")
           UPDATES=$(jq '[.resource_changes[] | select(.change.actions | index("update"))] | length' "$DRIFT_JSON")
           DELETES=$(jq '[.resource_changes[] | select(.change.actions | index("delete"))] | length' "$DRIFT_JSON")
@@ -137,19 +158,14 @@ jobs:
           echo "  Updates : $UPDATES"
           echo "  Deletes : $DELETES"
 
-          STATE_RESOURCES=$(terraform state list | wc -l | tr -d ' ')
-          if [ "$STATE_RESOURCES" -eq 0 ]; then
-            echo "First Terraform deployment — skipping drift enforcement."
-            exit 0
-          fi
-
+          # ---------------- INTENT AWARENESS ----------------
           BASE_BRANCH="${{ github.base_ref || 'main' }}"
           TF_CODE_CHANGED=$(git diff --name-only "origin/$BASE_BRANCH"...HEAD \
             | grep -E '\.tf$' || true)
 
           if [ "$TOTAL_CHANGES" -gt 0 ]; then
             if [ -z "$TF_CODE_CHANGED" ]; then
-              echo "ERROR: Terraform drift detected — infra changed without code change."
+              echo "ERROR: Terraform drift detected — infrastructure changed without code change."
 
               echo "========== Terraform Drift Summary =========="
               terraform show "$PLAN_FILE" \
@@ -173,6 +189,7 @@ jobs:
           name: drift-${{ env.ENV }}
           path: iac_outputs
           retention-days: 7
+   
 
 # ============================ IMPORT ==========================
   import:
