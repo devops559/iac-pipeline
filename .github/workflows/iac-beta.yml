@@ -5,7 +5,7 @@ on:
 
 jobs:
   check-promotion:
-    check-promotion:
+
     name: Verify DEV promotion
     runs-on: ubuntu-latest
     steps:
@@ -26,7 +26,7 @@ jobs:
             }
   beta:
     needs: check-promotion
-    uses: ./.github/workflows/reusable/infra-pipeline.yml
+    uses: ./.github/workflows/infra-pipeline.yml
     with:
       env: beta
       iac_tool: terraform

@@ -217,64 +217,63 @@ jobs:
 
 # ============================ APPLY ===========================
   apply:
-  name: Terraform Apply
-  needs:
-    - plan
-  runs-on: ubuntu-latest
-  container:
-    image: miradeeba766/iac-ci:1.14.6
-  environment:
-    name: ${{ inputs.env }}
+    name: Terraform Apply
+    needs:
+      - plan
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    environment:
+      name: ${{ inputs.env }}
 
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Download plan
-      uses: actions/download-artifact@v4
-      with:
-        name: plan-${{ env.ENV }}
+      - name: Download plan
+        uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ env.ENV }}
 
-    - name: Terraform apply
-      shell: bash
-      run: |
-        set -euo pipefail
+      - name: Terraform apply
+        shell: bash
+        run: |
+          set -euo pipefail
 
-        export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-        export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
 
-        chmod +x init.sh
-        bash init.sh "$ENV"
+          chmod +x init.sh
+          bash init.sh "$ENV"
 
-        terraform apply -input=false "env-${ENV}.tfplan"
+          terraform apply -input=false "env-${ENV}.tfplan"
 
-    - name: Save Terraform outputs
-      shell: bash
-      run: |
-        terraform output -json > "env-${ENV}_outputs.json"
+      - name: Save Terraform outputs
+        shell: bash
+        run: |
+          terraform output -json > "env-${ENV}_outputs.json"
 
-    - name: Upload Terraform outputs
-      uses: actions/upload-artifact@v4
-      with:
-        name: outputs-${{ env.ENV }}
-        path: env-${ENV}_outputs.json
-        retention-days: 90
+      - name: Upload Terraform outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: outputs-${{ env.ENV }}
+          path: env-${ENV}_outputs.json
+          retention-days: 90
 
-    # -------- Promotion marker (commit-SHA locked) --------
-    - name: Create promotion release
-      if: ${{ env.ENV != 'prod' }}
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: ${{ env.ENV }}-${{ github.sha }}
-        name: Promote ${{ env.ENV }} for ${{ github.sha }}
-        body: |
-          Environment: ${{ env.ENV }}
-          Commit: ${{ github.sha }}
-          Promoted at: ${{ github.run_id }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # -------- Promotion marker (commit-SHA locked via GitHub Release) --------
+      - name: Create promotion release
+        if: ${{ env.ENV != 'prod' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.ENV }}-${{ github.sha }}
+          name: Promote ${{ env.ENV }} for ${{ github.sha }}
+          body: |
+            Environment: ${{ env.ENV }}
+            Commit: ${{ github.sha }}
+            Promoted at: ${{ github.run_id }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  
 
 # =========================== DESTROY ==========================
   destroy:

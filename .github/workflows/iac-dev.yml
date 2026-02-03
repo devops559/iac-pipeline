@@ -5,7 +5,7 @@ on:
 
 jobs:
   dev:
-    uses: ./.github/workflows/reusable/infra-pipeline.yml
+    uses: ./.github/workflows/infra-pipeline.yml
     with:
       env: dev
       iac_tool: terraform

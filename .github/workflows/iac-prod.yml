@@ -26,7 +26,7 @@ jobs:
 
   prod:
     needs: check-promotion
-    uses: ./.github/workflows/reusable/infra-pipeline.yml
+    uses: ./.github/workflows/infra-pipeline.yml
     with:
       env: prod
       iac_tool: terraform
