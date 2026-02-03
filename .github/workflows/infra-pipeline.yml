@@ -33,11 +33,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Terraform fmt & validate
-        run: |
-          terraform init -backend=false
+      - name: Terraform fmt 
+        run: 
           terraform fmt -recursive -check
-          terraform validate
+
+      - name: Terraform  init 
+        run: 
+          terraform init -backend=false
+      - name: Terraform validate
+        run: 
+            terraform validate
 
       - name: TFLint
         run: |
