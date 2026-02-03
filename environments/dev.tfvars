@@ -1,5 +1,5 @@
 environment  = "dev"
-cluster_name = "dev-test-destroy"
+cluster_name = "dev-test-destroy-github"
 
 
 
