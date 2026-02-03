@@ -1,0 +1,33 @@
+name: IAC Prod
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-promotion:
+    name: Verify BETA promotion
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check BETA promotion release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tag = `beta-${context.sha}`;
+            try {
+              await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag
+              });
+              console.log(`BETA promotion found: ${tag}`);
+            } catch (e) {
+              core.setFailed(`BETA not promoted for commit ${context.sha}`);
+            }
+
+  prod:
+    needs: check-promotion
+    uses: ./.github/workflows/reusable/infra-pipeline.yml
+    with:
+      env: prod
+      iac_tool: terraform
+    secrets: inherit

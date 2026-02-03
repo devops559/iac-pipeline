@@ -1,0 +1,12 @@
+name: IAC Dev
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dev:
+    uses: ./.github/workflows/reusable/infra-pipeline.yml
+    with:
+      env: dev
+      iac_tool: terraform
+    secrets: inherit

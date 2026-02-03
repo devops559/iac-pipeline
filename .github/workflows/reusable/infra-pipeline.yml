@@ -1,0 +1,300 @@
+name: Reusable Terraform Infra Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      env:
+        required: true
+        type: string
+      iac_tool:
+        required: false
+        type: string
+        default: terraform
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+env:
+  ENV: ${{ inputs.env }}
+  IAC_TOOL: terraform
+  TF_VERSION: "1.14.2"
+  IAC_OUTPUT_DIR: iac_outputs
+
+jobs:
+
+# ========================= PRE-MERGE =========================
+  pre_merge:
+    name: Pre-merge Checks
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform fmt & validate
+        run: |
+          terraform init -backend=false
+          terraform fmt -recursive -check
+          terraform validate
+
+      - name: TFLint
+        run: |
+          tflint --init || true
+          tflint || true
+
+      - name: Gitleaks
+        run: |
+          gitleaks detect --no-git --redact
+
+# ============================ PLAN ============================
+  plan:
+    name: Terraform Plan
+    needs: pre_merge
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform plan
+        run: |
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+          chmod +x init.sh
+           bash init.sh "$ENV"
+
+          terraform plan \
+            -input=false \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="env-${ENV}.tfplan"
+
+          terraform show -json "env-${ENV}.tfplan" > "env-${ENV}.json"
+
+      - name: Upload plan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plan-${{ env.ENV }}
+          path: |
+            env-${ENV}.tfplan
+            env-${ENV}.json
+          retention-days: 7
+
+# ============================ DRIFT ===========================
+  drift:
+    name: Terraform Drift Detection (Intent Aware)
+    needs: plan
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download plan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: plan-${{ env.ENV }}
+
+      - name: Run drift detection
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p "$IAC_OUTPUT_DIR"
+
+          PLAN_FILE="env-${ENV}.tfplan"
+          DRIFT_JSON="$IAC_OUTPUT_DIR/drift-${ENV}.json"
+          
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+          chmod +x init.sh
+           bash init.sh "$ENV"
+
+          echo "Using existing Terraform plan: $PLAN_FILE"
+          terraform show -json "$PLAN_FILE" > "$DRIFT_JSON"
+
+          CREATES=$(jq '[.resource_changes[] | select(.change.actions | index("create"))] | length' "$DRIFT_JSON")
+          UPDATES=$(jq '[.resource_changes[] | select(.change.actions | index("update"))] | length' "$DRIFT_JSON")
+          DELETES=$(jq '[.resource_changes[] | select(.change.actions | index("delete"))] | length' "$DRIFT_JSON")
+          TOTAL_CHANGES=$((CREATES + UPDATES + DELETES))
+
+          echo "Terraform plan summary:"
+          echo "  Creates : $CREATES"
+          echo "  Updates : $UPDATES"
+          echo "  Deletes : $DELETES"
+
+          STATE_RESOURCES=$(terraform state list | wc -l | tr -d ' ')
+          if [ "$STATE_RESOURCES" -eq 0 ]; then
+            echo "First Terraform deployment — skipping drift enforcement."
+            exit 0
+          fi
+
+          BASE_BRANCH="${{ github.base_ref || 'main' }}"
+          TF_CODE_CHANGED=$(git diff --name-only "origin/$BASE_BRANCH"...HEAD \
+            | grep -E '\.tf$' || true)
+
+          if [ "$TOTAL_CHANGES" -gt 0 ]; then
+            if [ -z "$TF_CODE_CHANGED" ]; then
+              echo "ERROR: Terraform drift detected — infra changed without code change."
+
+              echo "========== Terraform Drift Summary =========="
+              terraform show "$PLAN_FILE" \
+                | sed -n '/Terraform will perform the following actions:/,$p'
+              echo "============================================"
+
+              exit 1
+            else
+              echo "Intentional Terraform change detected — allowing."
+              exit 0
+            fi
+          else
+            echo "No Terraform drift detected."
+            exit 0
+          fi
+
+      - name: Upload drift artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-${{ env.ENV }}
+          path: iac_outputs
+          retention-days: 7
+
+# ============================ IMPORT ==========================
+  import:
+    name: Terraform Import
+    needs: drift
+    if: needs.drift.result == 'failure'
+    environment: ${{ inputs.env }}
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform import
+        run: |
+          if [ -z "${TF_IMPORT_ADDRESS:-}" ] || [ -z "${TF_IMPORT_ID:-}" ]; then
+            echo "TF_IMPORT_ADDRESS and TF_IMPORT_ID must be provided"
+            exit 1
+          fi
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+          chmod +x init.sh
+           bash init.sh "$ENV"
+
+          terraform import "$TF_IMPORT_ADDRESS" "$TF_IMPORT_ID"
+          terraform state show "$TF_IMPORT_ADDRESS"
+
+# ========================= PLAN (POST IMPORT) =================
+  plan_drift:
+    name: Terraform Plan (After Import)
+    needs: import
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Re-plan after import
+        run: |
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+          chmod +x init.sh
+           bash init.sh "$ENV"
+          terraform plan \
+            -input=false \
+            -var-file="environments/${ENV}.tfvars" \
+            -out="env-${ENV}-drift.tfplan"
+
+# ============================ APPLY ===========================
+  apply:
+  name: Terraform Apply
+  needs:
+    - plan
+  runs-on: ubuntu-latest
+  container:
+    image: miradeeba766/iac-ci:1.14.6
+  environment:
+    name: ${{ inputs.env }}
+
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Download plan
+      uses: actions/download-artifact@v4
+      with:
+        name: plan-${{ env.ENV }}
+
+    - name: Terraform apply
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+        export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+        chmod +x init.sh
+        bash init.sh "$ENV"
+
+        terraform apply -input=false "env-${ENV}.tfplan"
+
+    - name: Save Terraform outputs
+      shell: bash
+      run: |
+        terraform output -json > "env-${ENV}_outputs.json"
+
+    - name: Upload Terraform outputs
+      uses: actions/upload-artifact@v4
+      with:
+        name: outputs-${{ env.ENV }}
+        path: env-${ENV}_outputs.json
+        retention-days: 90
+
+    # -------- Promotion marker (commit-SHA locked) --------
+    - name: Create promotion release
+      if: ${{ env.ENV != 'prod' }}
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ env.ENV }}-${{ github.sha }}
+        name: Promote ${{ env.ENV }} for ${{ github.sha }}
+        body: |
+          Environment: ${{ env.ENV }}
+          Commit: ${{ github.sha }}
+          Promoted at: ${{ github.run_id }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  
+
+# =========================== DESTROY ==========================
+  destroy:
+    name: Terraform Destroy
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    container:
+      image: miradeeba766/iac-ci:1.14.6
+    environment: ${{ inputs.env }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Terraform destroy
+        run: |
+
+          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
+          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
+
+          chmod +x init.sh
+           bash init.sh "$ENV"
+          terraform destroy \
+            -auto-approve \
+            -var-file="environments/${ENV}.tfvars"
