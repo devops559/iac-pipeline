@@ -3,15 +3,15 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "5.1.2"
 
-  name = "${var.cluster_name}-${var.environment}-vpc"
+  name = "dev-vpc"
   cidr = var.vpc_cidr
 
   azs             = var.azs
   private_subnets = var.private_subnets
   public_subnets  = var.public_subnets
 
-  enable_nat_gateway      = false
-  single_nat_gateway      = false
+  enable_nat_gateway      = true
+  single_nat_gateway      = true
   map_public_ip_on_launch = true
 
   tags = {
