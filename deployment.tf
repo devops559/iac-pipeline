@@ -4,7 +4,7 @@ module "vpc" {
   version = "5.1.2"
 
   name = "dev-vpc"
-  cidr = var.vpc_cidr
+  cidr = "10.0.0.0/16"
 
   azs             = var.azs
   private_subnets = var.private_subnets
