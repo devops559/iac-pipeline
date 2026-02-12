@@ -39,22 +39,3 @@ variable "public_subnets" {
 variable "private_subnets" {
   type = list(string)
 }
-
-#########################################
-# Node Group
-# #########################################
-# variable "node_instance_types" {
-#   type = list(string)
-# }
-
-# variable "node_desired_size" {
-#   type = number
-# }
-
-# variable "node_min_size" {
-#   type = number
-# }
-
-# variable "node_max_size" {
-#   type = number
-# }
