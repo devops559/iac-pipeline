@@ -9,8 +9,8 @@ vpc_cidr = "10.0.0.0/24"
 
 azs = ["us-east-1", "us-east-2"]
 
-private_subnets = ["10.0.0.0/26", "10.0.0.64/26"]
-public_subnets  = ["10.0.0.128/26", "10.0.0.192/26"]
+public_subnets  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets = ["10.0.3.0/24", "10.0.4.0/24"]
 
 # node_instance_types = ["t3.small"]
 # node_desired_size   = 1
