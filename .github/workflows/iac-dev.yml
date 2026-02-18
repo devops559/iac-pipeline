@@ -1,12 +1,35 @@
-name: IAC Dev
+name: Dev Infra
 
 on:
-  workflow_dispatch:
+  push:
+    branches: [ "main" ]
 
 jobs:
-  dev:
-    uses: ./.github/workflows/infra-pipeline.yml
-    with:
-      env: dev
-      iac_tool: terraform
-    secrets: inherit
+  terraform:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<DEV_ACCOUNT_ID>:role/GitHubOIDC-Terraform
+          aws-region: us-east-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -var="container_image=${{ secrets.ECR_IMAGE_URI }}"
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve -var="container_image=${{ secrets.ECR_IMAGE_URI }}"
+
