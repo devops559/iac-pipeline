@@ -68,3 +68,9 @@ variable "assign_public_ip" {
   description = "Assign public IP to ECS tasks"
   type        = bool
 }
+
+variable "db_secret_arn" {
+  description = "ARN of database secret in AWS Secrets Manager"
+  type        = string
+  default     = null
+}
