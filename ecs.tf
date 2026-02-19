@@ -23,3 +23,33 @@ resource "aws_ecs_service" "this" {
     container_port   = 80
   }
 }
+#aws secret
+resource "aws_ecs_task_definition" "this" {
+  family                   = "${var.project}-${var.environment}-task"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = var.task_cpu
+  memory                   = var.task_memory
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "app"
+      image     = var.container_image
+      essential = true
+
+      portMappings = [{
+        containerPort = 80
+        protocol      = "tcp"
+      }]
+
+      # Optional Secret Injection
+      secrets = var.db_secret_arn == null ? [] : [
+        {
+          name      = "DB_PASSWORD"
+          valueFrom = var.db_secret_arn
+        }
+      ]
+    }
+  ])
+}
