@@ -1,3 +1,7 @@
+resource "aws_ecs_cluster" "this" {
+  name = "${var.project}-${var.environment}-cluster"
+}
+
 resource "aws_ecs_service" "this" {
   name            = "${var.project}-${var.environment}-svc"
   cluster         = aws_ecs_cluster.this.id
@@ -52,4 +56,27 @@ resource "aws_ecs_task_definition" "this" {
       ]
     }
   ])
+}
+resource "aws_security_group" "ecs" {
+  name        = "${var.project}-${var.environment}-ecs-sg"
+  description = "ECS Service Security Group"
+  vpc_id      = aws_vpc.this.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # later restrict to ALB SG
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.project}-${var.environment}-ecs-sg"
+  }
 }
