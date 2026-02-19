@@ -9,23 +9,16 @@ on:
         required: false
         type: string
         default: terraform
-    secrets:
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
-      DB_SECRET_ARN:
-        required: true
-
+    
+permissions:
+  id-token: write
+  contents: read
+  
 env:
   ENV: ${{ inputs.env }}
   IAC_TOOL: terraform
   TF_VERSION: "1.14.2"
   IAC_OUTPUT_DIR: iac_outputs
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  TF_VAR_db_secret_arn: ${{ secrets.DB_SECRET_ARN }}
-  AWS_REGION: ap-south-1
 jobs:
 
 # ========================= PRE-MERGE =========================
@@ -66,11 +59,11 @@ jobs:
       image: miradeeba766/iac-ci:1.14.6
     steps:
       - uses: actions/checkout@v4
-      - name: Terraform aws export
-        run: |
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
-          export AWS_REGION="${AWS_REGION:-us-east-1}"
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
       - name: Terraform init
         run: |
            chmod +x init.sh
@@ -112,6 +105,12 @@ jobs:
         with:
           name: plan-${{ env.ENV }}
 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
+            
       - name: Terraform drift detection
         shell: bash
         run: |
@@ -121,11 +120,6 @@ jobs:
 
           PLAN_FILE="env-${ENV}.tfplan"
           DRIFT_JSON="$IAC_OUTPUT_DIR/drift-${ENV}.json"
-
-          # AWS credentials (required for backend + state)
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
-          export AWS_REGION="${AWS_REGION:-us-east-1}"
 
           chmod +x init.sh
           bash init.sh "$ENV"
@@ -202,16 +196,19 @@ jobs:
       image: miradeeba766/iac-ci:1.14.6
     steps:
       - uses: actions/checkout@v4
-
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
+            
       - name: Terraform import
         run: |
           if [ -z "${TF_IMPORT_ADDRESS:-}" ] || [ -z "${TF_IMPORT_ID:-}" ]; then
             echo "TF_IMPORT_ADDRESS and TF_IMPORT_ID must be provided"
             exit 1
           fi
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
-          export AWS_REGION="${AWS_REGION:-us-east-1}"
+          
           chmod +x init.sh
            bash init.sh "$ENV"
 
@@ -227,11 +224,14 @@ jobs:
       image: miradeeba766/iac-ci:1.14.6
     steps:
       - uses: actions/checkout@v4
-
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
+            
       - name: Re-plan after import
         run: |
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
 
           chmod +x init.sh
            bash init.sh "$ENV"
@@ -256,7 +256,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
+            
       - name: Download plan
         uses: actions/download-artifact@v4
         with:
@@ -267,9 +272,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
-          export AWS_REGION="${AWS_REGION:-us-east-1}"
           chmod +x init.sh
           bash init.sh "$ENV"
 
@@ -313,13 +315,15 @@ jobs:
     environment: ${{ inputs.env }}
     steps:
       - uses: actions/checkout@v4
-
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            role-to-assume: arn:aws:iam::958486869486:role/github-terraform-oidc-role
+            aws-region: ap-south-1
+            
       - name: Terraform destroy
         run: |
 
-          export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID:?}"
-          export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY:?}"
-          export AWS_REGION="${AWS_REGION:-us-east-1}"
           chmod +x init.sh
            bash init.sh "$ENV"
           terraform destroy \
