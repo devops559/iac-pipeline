@@ -3,7 +3,7 @@ variable "region" {
 }
 
 variable "project" {
-  default = "myapp"
+  default = "iac"
 }
 
 variable "vpc_cidr" {
