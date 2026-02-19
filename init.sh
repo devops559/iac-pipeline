@@ -24,6 +24,6 @@ ENV="$1"
 terraform init \
   -backend-config="bucket=terraform-statefile-testing-dev" \
   -backend-config="key=${ENV}/terraform.tfstate" \
-  -backend-config="region=us-east-1" \
+  -backend-config="region=ap-south-1" \
   -backend-config="dynamodb_table=terraform-testing-dev" \
   -backend-config="encrypt=true"
