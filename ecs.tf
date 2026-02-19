@@ -12,9 +12,9 @@ resource "aws_ecs_service" "this" {
   health_check_grace_period_seconds  = 60
 
   network_configuration {
-    subnets          = aws_subnet.private[*].id  
+    subnets          = aws_subnet.private[*].id
     security_groups  = [aws_security_group.ecs.id]
-    assign_public_ip = false                      
+    assign_public_ip = false
   }
 
   load_balancer {

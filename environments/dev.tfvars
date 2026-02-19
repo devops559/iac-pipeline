@@ -12,7 +12,7 @@ private_subnets = [
 ]
 enable_nat_gateway = true
 single_nat_gateway = true
-assign_public_ip = false
+assign_public_ip   = false
 
 # ECS
 container_image = "958486869486.dkr.ecr.ap-south-1.amazonaws.com/dev-app:latest"
