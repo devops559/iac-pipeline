@@ -56,13 +56,13 @@ resource "aws_ecs_task_definition" "this" {
       ]
 
       logConfiguration = var.enable_cloudwatch_logs ? {
-      logDriver = "awslogs"
-      options = {
-        awslogs-group         = "/ecs/${var.project}-${var.environment}"
-        awslogs-region        = var.region
-        awslogs-stream-prefix = "ecs"
-      }
-    } : null
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/${var.project}-${var.environment}"
+          awslogs-region        = var.region
+          awslogs-stream-prefix = "ecs"
+        }
+      } : null
 
     }
   ])
