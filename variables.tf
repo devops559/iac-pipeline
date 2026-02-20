@@ -74,3 +74,9 @@ variable "db_secret_arn" {
   type        = string
   default     = null
 }
+
+variable "enable_cloudwatch_logs" {
+  description = "Enable CloudWatch logging for ECS"
+  type        = bool
+  default     = false
+}

@@ -20,3 +20,6 @@ container_image = "958486869486.dkr.ecr.ap-south-1.amazonaws.com/dev-app:latest"
 task_cpu      = 256
 task_memory   = 512
 desired_count = 1
+
+enable_cloudwatch_logs = false
+db_secret_arn          = null

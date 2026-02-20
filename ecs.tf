@@ -80,3 +80,9 @@ resource "aws_security_group" "ecs" {
     Name = "${var.project}-${var.environment}-ecs-sg"
   }
 }
+resource "aws_cloudwatch_log_group" "ecs" {
+  count = var.enable_cloudwatch_logs ? 1 : 0
+
+  name              = "/ecs/${var.project}-${var.environment}"
+  retention_in_days = 7
+}
