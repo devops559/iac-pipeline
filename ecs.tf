@@ -54,6 +54,16 @@ resource "aws_ecs_task_definition" "this" {
           valueFrom = var.db_secret_arn
         }
       ]
+
+      logConfiguration = var.enable_cloudwatch_logs ? {
+      logDriver = "awslogs"
+      options = {
+        awslogs-group         = "/ecs/${var.project}-${var.environment}"
+        awslogs-region        = var.region
+        awslogs-stream-prefix = "ecs"
+      }
+    } : null
+
     }
   ])
 }
